@@ -51,7 +51,7 @@ struct IntegrationTests {
 
         let transport = makeTransport(apiKey: apiKey)
         let tmpDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("fermata-integration-\(UUID().uuidString)")
+            .appendingPathComponent("swift-agent-loop-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmpDir) }
 
@@ -88,7 +88,7 @@ struct IntegrationTests {
         let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"]!
 
         let tmpDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("fermata-integration-\(UUID().uuidString)")
+            .appendingPathComponent("swift-agent-loop-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmpDir) }
 
@@ -134,7 +134,7 @@ struct IntegrationTests {
         let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"]!
 
         let tmpDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("fermata-integration-\(UUID().uuidString)")
+            .appendingPathComponent("swift-agent-loop-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmpDir) }
 
@@ -179,7 +179,7 @@ struct IntegrationTests {
         let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"]!
 
         let tmpDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("fermata-integration-\(UUID().uuidString)")
+            .appendingPathComponent("swift-agent-loop-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmpDir) }
 
@@ -221,7 +221,7 @@ struct IntegrationTests {
         let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"]!
 
         let tmpDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("fermata-integration-\(UUID().uuidString)")
+            .appendingPathComponent("swift-agent-loop-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmpDir) }
 
@@ -262,7 +262,7 @@ struct IntegrationTests {
         let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"]!
 
         let tmpDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("fermata-integration-\(UUID().uuidString)")
+            .appendingPathComponent("swift-agent-loop-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmpDir) }
 

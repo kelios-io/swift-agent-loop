@@ -12,6 +12,19 @@ A native Swift agentic loop for the Anthropic Messages API. Run Claude as a codi
 - **Configurable system prompt** — environment-aware prompt builder
 - **Zero dependencies** — Foundation only, no external packages
 
+## Benchmarks
+
+| Metric | SwiftAgentLoop | Claude Code CLI (Node.js) | Delta |
+|--------|---------------|--------------------------|-------|
+| Cold start | **0.36 ms** | ~300-500 ms | **~1000x faster** |
+| Memory baseline | **8.4 MB** | ~270-370 MB | **~40x less** |
+| Memory (20-turn session) | **9.1 MB** | 600 MB+ reported | **~66x less** |
+| Tool roundtrip (Read) | **1.14 ms** | ~90-100 ms (IPC) | **~80x faster** |
+| Tool roundtrip (Bash) | **1.47 ms** | ~30 ms (spawn) | **~20x faster** |
+| SSE parse (1K events) | **109 ms** | No published data | — |
+
+See [docs/benchmarks.md](docs/benchmarks.md) for full methodology and sources.
+
 ## Requirements
 
 - macOS 15+
