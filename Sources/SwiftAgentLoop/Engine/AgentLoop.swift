@@ -13,6 +13,9 @@ public struct AgentConfiguration: Sendable {
     public let workingDirectory: URL
     public let temperature: Double?
     public let topP: Double?
+    public let thinkingEnabled: Bool
+    public let thinkingBudgetTokens: Int?
+    public let contextCompressionEnabled: Bool
 
     public init(
         model: String = "claude-sonnet-4-20250514",
@@ -23,7 +26,10 @@ public struct AgentConfiguration: Sendable {
         permissionCallback: PermissionCallback? = nil,
         workingDirectory: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
         temperature: Double? = nil,
-        topP: Double? = nil
+        topP: Double? = nil,
+        thinkingEnabled: Bool = false,
+        thinkingBudgetTokens: Int? = nil,
+        contextCompressionEnabled: Bool = false
     ) {
         self.model = model
         self.maxTokens = maxTokens
@@ -34,6 +40,9 @@ public struct AgentConfiguration: Sendable {
         self.workingDirectory = workingDirectory
         self.temperature = temperature
         self.topP = topP
+        self.thinkingEnabled = thinkingEnabled
+        self.thinkingBudgetTokens = thinkingBudgetTokens
+        self.contextCompressionEnabled = contextCompressionEnabled
     }
 }
 
@@ -209,6 +218,19 @@ public actor AgentLoop {
         // Scale up max_tokens on recovery attempts (exponential: 1x → 2x → 4x → 8x)
         let maxTokens = effectiveMaxTokens()
 
+        // Extended thinking config
+        let thinking: ThinkingConfig? = configuration.thinkingEnabled
+            ? ThinkingConfig(budgetTokens: configuration.thinkingBudgetTokens)
+            : nil
+
+        // Server-side context compression
+        let contextManagement: ContextManagementConfig? = configuration.contextCompressionEnabled
+            ? ContextManagementConfig()
+            : nil
+
+        // API rejects temperature when thinking is enabled
+        let temperature: Double? = configuration.thinkingEnabled ? nil : configuration.temperature
+
         return MessagesRequest(
             model: configuration.model,
             maxTokens: maxTokens,
@@ -216,8 +238,10 @@ public actor AgentLoop {
             system: systemBlocks,
             tools: toolDefs,
             stream: true,
-            temperature: configuration.temperature,
-            topP: configuration.topP
+            temperature: temperature,
+            topP: configuration.topP,
+            thinking: thinking,
+            contextManagement: contextManagement
         )
     }
 
@@ -304,7 +328,7 @@ public actor AgentLoop {
                     blocksByIndex[index] = .toolUse(id: id, name: name, inputJSON: "")
                     continuation.yield(.toolUseStart(id: id, name: name))
                 case "thinking":
-                    blocksByIndex[index] = .thinking(accumulated: info.thinking ?? "")
+                    blocksByIndex[index] = .thinking(accumulated: info.thinking ?? "", signature: info.signature)
                 default:
                     break
                 }
@@ -328,16 +352,19 @@ public actor AgentLoop {
                     }
 
                 case .thinkingDelta(let thinking):
-                    if case .thinking(var accumulated) = blocksByIndex[index] {
+                    if case .thinking(var accumulated, let sig) = blocksByIndex[index] {
                         accumulated += thinking
-                        blocksByIndex[index] = .thinking(accumulated: accumulated)
+                        blocksByIndex[index] = .thinking(accumulated: accumulated, signature: sig)
                     }
                     continuation.yield(.thinkingDelta(thinking))
                 }
 
-            case .contentBlockStop:
-                // Block finalized — nothing extra needed; we keep the accumulated data
-                break
+            case .contentBlockStop(let stop):
+                // Capture signature for thinking blocks (cryptographically signed by API)
+                if let sig = stop.signature,
+                   case .thinking(let accumulated, _) = blocksByIndex[stop.index] {
+                    blocksByIndex[stop.index] = .thinking(accumulated: accumulated, signature: sig)
+                }
 
             case .messageDelta(let delta):
                 stopReason = delta.delta.stopReason
@@ -369,8 +396,8 @@ public actor AgentLoop {
             case .toolUse(let id, let name, let inputJSON):
                 let input = Self.parseToolInput(inputJSON)
                 return .toolUse(ToolUseBlock(id: id, name: name, input: input))
-            case .thinking(let accumulated):
-                return .thinking(ThinkingBlock(thinking: accumulated))
+            case .thinking(let accumulated, let signature):
+                return .thinking(ThinkingBlock(thinking: accumulated, signature: signature))
             }
         }
 
@@ -381,7 +408,7 @@ public actor AgentLoop {
     private enum InProgressBlock {
         case text(accumulated: String)
         case toolUse(id: String, name: String, inputJSON: String)
-        case thinking(accumulated: String)
+        case thinking(accumulated: String, signature: String?)
     }
 
     // MARK: - Tool Input Parsing

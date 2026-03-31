@@ -18,4 +18,8 @@ struct AgentState: Sendable {
 
     /// Whether the loop has been cancelled.
     var isCancelled: Bool = false
+
+    /// Last reported input token count from API usage events.
+    /// Used for context window monitoring and autocompact threshold (E3).
+    var lastInputTokenCount: Int = 0
 }

@@ -1,11 +1,23 @@
 import Foundation
 
 /// Manages conversation context window.
-/// Currently a pass-through; server-side compaction will be added in E2.
+///
+/// E2: Server-side compaction via the `context_management` API parameter.
+/// E3: Client-side autocompact with token estimation and threshold triggers.
 public struct ContextManager: Sendable {
-    public init() {}
+    public let contextCompressionEnabled: Bool
 
-    /// Returns messages unmodified. Compaction logic deferred to E2.
+    public init(contextCompressionEnabled: Bool = false) {
+        self.contextCompressionEnabled = contextCompressionEnabled
+    }
+
+    /// Returns the context management config for API requests, if compression is enabled.
+    public func contextManagementConfig() -> ContextManagementConfig? {
+        guard contextCompressionEnabled else { return nil }
+        return ContextManagementConfig()
+    }
+
+    /// Returns messages, potentially compacted. Client-side compaction deferred to E3.
     public func compact(messages: [Message]) -> [Message] {
         messages
     }

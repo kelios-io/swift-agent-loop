@@ -16,6 +16,8 @@ public struct MessagesRequest: Codable, Sendable {
     public let stream: Bool
     public let temperature: Double?
     public let topP: Double?
+    public let thinking: ThinkingConfig?
+    public let contextManagement: ContextManagementConfig?
 
     public init(
         model: String,
@@ -25,7 +27,9 @@ public struct MessagesRequest: Codable, Sendable {
         tools: [ToolDefinition]? = nil,
         stream: Bool = false,
         temperature: Double? = nil,
-        topP: Double? = nil
+        topP: Double? = nil,
+        thinking: ThinkingConfig? = nil,
+        contextManagement: ContextManagementConfig? = nil
     ) {
         self.model = model
         self.maxTokens = maxTokens
@@ -35,6 +39,8 @@ public struct MessagesRequest: Codable, Sendable {
         self.stream = stream
         self.temperature = temperature
         self.topP = topP
+        self.thinking = thinking
+        self.contextManagement = contextManagement
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -46,6 +52,47 @@ public struct MessagesRequest: Codable, Sendable {
         case stream
         case temperature
         case topP = "top_p"
+        case thinking
+        case contextManagement = "context_management"
+    }
+}
+
+// MARK: - Thinking Configuration
+
+/// Configuration for extended thinking in API requests.
+/// Use `budgetTokens: nil` for adaptive thinking on Opus/Sonnet 4.6.
+public struct ThinkingConfig: Codable, Sendable {
+    public let type: String
+    public let budgetTokens: Int?
+
+    public init(type: String = "enabled", budgetTokens: Int? = nil) {
+        self.type = type
+        self.budgetTokens = budgetTokens
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case budgetTokens = "budget_tokens"
+    }
+}
+
+// MARK: - Context Management Configuration
+
+/// Configuration for server-side context compression.
+public struct ContextManagementConfig: Codable, Sendable {
+    public let edits: [CompactionEdit]
+
+    public init(edits: [CompactionEdit] = [CompactionEdit()]) {
+        self.edits = edits
+    }
+}
+
+/// A single compaction edit directive.
+public struct CompactionEdit: Codable, Sendable {
+    public let type: String
+
+    public init(type: String = "compact_20260112") {
+        self.type = type
     }
 }
 
@@ -211,10 +258,14 @@ public struct ToolResultBlock: Codable, Sendable {
 public struct ThinkingBlock: Codable, Sendable {
     public let type: String
     public let thinking: String
+    /// Cryptographic signature from the API. Must be preserved byte-identical
+    /// when round-tripping thinking blocks through tool-use loops.
+    public let signature: String?
 
-    public init(thinking: String) {
+    public init(thinking: String, signature: String? = nil) {
         self.type = "thinking"
         self.thinking = thinking
+        self.signature = signature
     }
 }
 
@@ -353,6 +404,16 @@ public struct ContentBlockInfo: Codable, Sendable {
     public let name: String?
     public let text: String?
     public let thinking: String?
+    public let signature: String?
+
+    public init(type: String, id: String? = nil, name: String? = nil, text: String? = nil, thinking: String? = nil, signature: String? = nil) {
+        self.type = type
+        self.id = id
+        self.name = name
+        self.text = text
+        self.thinking = thinking
+        self.signature = signature
+    }
 }
 
 public struct ContentBlockDeltaEvent: Codable, Sendable {
@@ -420,6 +481,14 @@ public enum DeltaContent: Codable, Sendable {
 public struct ContentBlockStopEvent: Codable, Sendable {
     public let type: String
     public let index: Int
+    /// Cryptographic signature for thinking blocks, delivered on stop.
+    public let signature: String?
+
+    public init(type: String, index: Int, signature: String? = nil) {
+        self.type = type
+        self.index = index
+        self.signature = signature
+    }
 }
 
 public struct MessageDeltaEvent: Codable, Sendable {

@@ -83,7 +83,9 @@ public actor AnthropicClient: MessageStreaming {
             tools: messagesRequest.tools,
             stream: true,
             temperature: messagesRequest.temperature,
-            topP: messagesRequest.topP
+            topP: messagesRequest.topP,
+            thinking: messagesRequest.thinking,
+            contextManagement: messagesRequest.contextManagement
         )
 
         let encoder = JSONEncoder()
