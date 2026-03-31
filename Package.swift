@@ -21,6 +21,11 @@ let package = Package(
             dependencies: ["SwiftAgentLoop"],
             path: "Sources/AgentCLI"
         ),
+        .executableTarget(
+            name: "SwiftAgentLoopBenchmarks",
+            dependencies: ["SwiftAgentLoop"],
+            path: "Sources/Benchmarks"
+        ),
         .testTarget(
             name: "SwiftAgentLoopTests",
             dependencies: ["SwiftAgentLoop"],
