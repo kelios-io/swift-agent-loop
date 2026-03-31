@@ -8,9 +8,8 @@ struct BenchmarkResult: Sendable {
 }
 
 /// Simple benchmark harness using ContinuousClock.
-@MainActor
 enum BenchmarkHarness {
-    private(set) static var results: [BenchmarkResult] = []
+    nonisolated(unsafe) private(set) static var results: [BenchmarkResult] = []
 
     /// Measure an async block over N iterations. Reports min/avg/p99.
     static func measure(
@@ -18,7 +17,7 @@ enum BenchmarkHarness {
         iterations: Int = 100,
         warmup: Int = 5,
         unit: String = "ms",
-        block: @Sendable () async throws -> Void
+        block: () async throws -> Void
     ) async rethrows {
         for _ in 0..<warmup {
             try await block()
@@ -51,7 +50,7 @@ enum BenchmarkHarness {
     static func measureOnce(
         name: String,
         unit: String = "ms",
-        block: @Sendable () async throws -> Void
+        block: () async throws -> Void
     ) async rethrows {
         let clock = ContinuousClock()
         let elapsed = try await clock.measure {

@@ -1,6 +1,9 @@
 import Foundation
 @testable import SwiftAgentLoop
 
+// Force unbuffered stdout
+setbuf(stdout, nil)
+
 print("SwiftAgentLoop Benchmark Suite")
 print("==============================\n")
 
@@ -12,8 +15,10 @@ let hasAPIKey = apiKey != nil && !apiKey!.isEmpty
 print("API key: \(hasAPIKey ? "available (e2e benchmarks enabled)" : "not set (e2e benchmarks skipped)")")
 
 // Create file tree fixture for tool benchmarks
-print("\nSetting up file tree fixture (10K files)...")
-let fixture = try FileTreeFixture.create()
+let fileCount = 100
+let iterations = 10
+print("\nSetting up file tree fixture (\(fileCount) files)...")
+let fixture = try FileTreeFixture.create(fileCount: fileCount)
 let context = ToolContext(workingDirectory: fixture.rootDir)
 print("Fixture ready at: \(fixture.rootDir.path)\n")
 
@@ -67,7 +72,7 @@ do {
 // MARK: - 4. SSE Parse Throughput
 
 do {
-    let eventCount = 10_000
+    let eventCount = 1_000
     let sseData = MockSSEData.generateEvents(count: eventCount)
     let bytes = Array(sseData)
 
@@ -95,7 +100,7 @@ do {
 // MARK: - 5. Tool Roundtrip: Read
 
 let readTool = ReadTool()
-try await BenchmarkHarness.measure(name: "tool_roundtrip_read", iterations: 100) {
+try await BenchmarkHarness.measure(name: "tool_roundtrip_read", iterations: iterations) {
     let _ = try await readTool.execute(
         input: ["file_path": fixture.singleFilePath],
         context: context
@@ -107,7 +112,7 @@ try await BenchmarkHarness.measure(name: "tool_roundtrip_read", iterations: 100)
 let editTool = EditTool()
 // Write a file to edit, reset each iteration
 let editFilePath = fixture.rootDir.appendingPathComponent("edit_bench.txt").path
-try await BenchmarkHarness.measure(name: "tool_roundtrip_edit", iterations: 100) {
+try await BenchmarkHarness.measure(name: "tool_roundtrip_edit", iterations: iterations) {
     // Reset file
     try "Hello world\nSecond line\nThird line\n".write(
         toFile: editFilePath, atomically: false, encoding: .utf8
@@ -121,7 +126,7 @@ try await BenchmarkHarness.measure(name: "tool_roundtrip_edit", iterations: 100)
 // MARK: - 7. Tool Roundtrip: Glob
 
 let globTool = GlobTool()
-try await BenchmarkHarness.measure(name: "tool_roundtrip_glob", iterations: 100) {
+try await BenchmarkHarness.measure(name: "tool_roundtrip_glob", iterations: iterations) {
     let _ = try await globTool.execute(
         input: ["pattern": "**/*.swift"],
         context: context
@@ -131,7 +136,7 @@ try await BenchmarkHarness.measure(name: "tool_roundtrip_glob", iterations: 100)
 // MARK: - 8. Tool Roundtrip: Grep
 
 let grepTool = GrepTool()
-try await BenchmarkHarness.measure(name: "tool_roundtrip_grep", iterations: 100) {
+try await BenchmarkHarness.measure(name: "tool_roundtrip_grep", iterations: iterations) {
     let _ = try await grepTool.execute(
         input: ["pattern": "process_.*\\(\\)", "output_mode": "files_with_matches"],
         context: context
@@ -141,7 +146,7 @@ try await BenchmarkHarness.measure(name: "tool_roundtrip_grep", iterations: 100)
 // MARK: - 9. Tool Roundtrip: Bash
 
 let bashTool = BashTool()
-try await BenchmarkHarness.measure(name: "tool_roundtrip_bash", iterations: 100) {
+try await BenchmarkHarness.measure(name: "tool_roundtrip_bash", iterations: iterations) {
     let _ = try await bashTool.execute(
         input: ["command": "echo hello"],
         context: context
