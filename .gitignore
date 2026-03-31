@@ -1,0 +1,26 @@
+# Build
+.build/
+*.xcodeproj
+xcuserdata/
+DerivedData/
+
+# SwiftPM
+.swiftpm/
+Package.resolved
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+*.xcworkspace
+.idea/
+*.swp
+*~
+
+# Secrets
+.env
+*.key
+
+# Reference docs (Fermata-specific, not part of the package)
+docs/
