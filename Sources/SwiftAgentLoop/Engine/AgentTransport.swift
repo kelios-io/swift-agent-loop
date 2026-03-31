@@ -41,7 +41,42 @@ public actor NativeTransport: AgentTransport {
         thinkingBudgetTokens: Int? = nil,
         contextCompressionEnabled: Bool = false
     ) {
-        self.client = AnthropicClient(apiKey: apiKey, requestTimeout: requestTimeout)
+        let client = AnthropicClient(apiKey: apiKey, requestTimeout: requestTimeout)
+        self.client = client
+        self.promptBuilder = SystemPromptBuilder()
+        self.permissionCallback = permissionCallback
+        self.model = model
+        self.maxTokens = maxTokens
+        self.maxTurns = maxTurns
+        self.temperature = temperature
+        self.topP = topP
+        self.thinkingEnabled = thinkingEnabled
+        self.thinkingBudgetTokens = thinkingBudgetTokens
+        self.contextCompressionEnabled = contextCompressionEnabled
+
+        // If no tools provided, include SubagentTool by default
+        if tools.isEmpty {
+            self.tools = []
+        } else {
+            self.tools = tools
+        }
+    }
+
+    /// Internal init that accepts a pre-built client — used by `withDefaultTools()`.
+    init(
+        client: AnthropicClient,
+        model: String,
+        maxTokens: Int,
+        maxTurns: Int,
+        tools: [any AgentTool],
+        permissionCallback: PermissionCallback?,
+        temperature: Double?,
+        topP: Double?,
+        thinkingEnabled: Bool,
+        thinkingBudgetTokens: Int?,
+        contextCompressionEnabled: Bool
+    ) {
+        self.client = client
         self.promptBuilder = SystemPromptBuilder()
         self.tools = tools
         self.permissionCallback = permissionCallback
@@ -122,7 +157,7 @@ public actor NativeTransport: AgentTransport {
 // MARK: - Default Tools Factory
 
 extension NativeTransport {
-    /// Create a transport with all built-in tools registered.
+    /// Create a transport with all built-in tools registered, including the Agent tool for subagent spawning.
     public static func withDefaultTools(
         apiKey: String,
         model: String = "claude-sonnet-4-6",
@@ -134,19 +169,25 @@ extension NativeTransport {
         thinkingBudgetTokens: Int? = nil,
         contextCompressionEnabled: Bool = false
     ) -> NativeTransport {
-        NativeTransport(
-            apiKey: apiKey,
+        // Create client first so SubagentTool can share it
+        let client = AnthropicClient(apiKey: apiKey, requestTimeout: requestTimeout)
+        let subagentTool = SubagentTool(client: client, parentModel: model)
+
+        return NativeTransport(
+            client: client,
             model: model,
+            maxTokens: 4096,
+            maxTurns: 50,
             tools: [
                 ReadTool(),
                 WriteTool(),
                 EditTool(),
                 BashTool(),
                 GlobTool(),
-                GrepTool()
+                GrepTool(),
+                subagentTool
             ],
             permissionCallback: permissionCallback,
-            requestTimeout: requestTimeout,
             temperature: temperature,
             topP: topP,
             thinkingEnabled: thinkingEnabled,

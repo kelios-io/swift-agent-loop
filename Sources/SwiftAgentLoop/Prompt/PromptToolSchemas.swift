@@ -321,10 +321,48 @@ public enum ToolSchemas {
         ])
     )
 
+    // MARK: - Agent (Subagent Spawning)
+
+    /// Agent tool — launch a subagent to handle a task autonomously
+    public static let agent = ToolDefinition(
+        name: "Agent",
+        description: """
+            Launch a new agent to handle complex, multi-step tasks autonomously.
+
+            The Agent tool launches specialized agents (subprocesses) that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
+
+            Available agent types:
+            - general: General-purpose agent with all tools (Read, Write, Edit, Bash, Glob, Grep). Use for tasks requiring file modifications or shell commands.
+            - explore: Fast agent specialized for exploring codebases. Has read-only tools (Read, Glob, Grep). Use when you need to find files, search code, or understand codebase structure.
+            - plan: Software architect agent for designing implementation plans. Has read-only tools. Use when you need to plan implementation strategy for a task.
+
+            When using the Agent tool:
+            - Provide clear, detailed prompts so the agent can work autonomously
+            - Launch multiple agents concurrently when tasks are independent
+            - The agent's outputs should generally be trusted
+            """,
+        inputSchema: .object([
+            "type": .string("object"),
+            "properties": .object([
+                "prompt": .object([
+                    "type": .string("string"),
+                    "description": .string("The task for the agent to perform"),
+                ]),
+                "subagent_type": .object([
+                    "type": .string("string"),
+                    "description": .string("The type of specialized agent: 'general', 'explore', or 'plan'"),
+                    "enum": .array([.string("general"), .string("explore"), .string("plan")]),
+                ]),
+            ]),
+            "required": .array([.string("prompt")]),
+            "additionalProperties": .bool(false),
+        ])
+    )
+
     // MARK: - All Tools
 
-    /// All six tool definitions in registration order.
+    /// All tool definitions in registration order.
     public static let all: [ToolDefinition] = [
-        read, write, edit, bash, glob, grep,
+        read, write, edit, bash, glob, grep, agent,
     ]
 }
