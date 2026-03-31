@@ -11,6 +11,8 @@ public struct AgentConfiguration: Sendable {
     public let tools: [any AgentTool]
     public let permissionCallback: PermissionCallback?
     public let workingDirectory: URL
+    public let temperature: Double?
+    public let topP: Double?
 
     public init(
         model: String = "claude-sonnet-4-20250514",
@@ -19,7 +21,9 @@ public struct AgentConfiguration: Sendable {
         systemPrompt: String? = nil,
         tools: [any AgentTool] = [],
         permissionCallback: PermissionCallback? = nil,
-        workingDirectory: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        workingDirectory: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
+        temperature: Double? = nil,
+        topP: Double? = nil
     ) {
         self.model = model
         self.maxTokens = maxTokens
@@ -28,6 +32,8 @@ public struct AgentConfiguration: Sendable {
         self.tools = tools
         self.permissionCallback = permissionCallback
         self.workingDirectory = workingDirectory
+        self.temperature = temperature
+        self.topP = topP
     }
 }
 
@@ -209,7 +215,9 @@ public actor AgentLoop {
             messages: state.messages,
             system: systemBlocks,
             tools: toolDefs,
-            stream: true
+            stream: true,
+            temperature: configuration.temperature,
+            topP: configuration.topP
         )
     }
 
@@ -595,19 +603,39 @@ public actor AgentLoop {
         }
     }
 
-    /// Execute a single tool call (stateless helper — safe to call from TaskGroup).
+    /// Execute a single tool call with timeout (stateless helper — safe to call from TaskGroup).
     private static func executeSingleTool(
         tool: any AgentTool,
         toolUse: ToolUseBlock,
         input: SendableInputWrapper,
         context: ToolContext
     ) async -> ToolResultBlock {
+        let toolTimeout = tool.timeout
         do {
-            let toolResult = try await tool.execute(input: input.value, context: context)
+            let toolResult = try await withThrowingTaskGroup(of: ToolResult.self) { group in
+                group.addTask {
+                    try await tool.execute(input: input.value, context: context)
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: UInt64(toolTimeout * 1_000_000_000))
+                    throw ToolError.timeout
+                }
+                guard let result = try await group.next() else {
+                    throw ToolError.timeout
+                }
+                group.cancelAll()
+                return result
+            }
             return ToolResultBlock(
                 toolUseId: toolUse.id,
                 content: toolResult.content,
                 isError: toolResult.isError ? true : nil
+            )
+        } catch ToolError.timeout {
+            return ToolResultBlock(
+                toolUseId: toolUse.id,
+                content: "Tool execution timed out after \(Int(toolTimeout))s",
+                isError: true
             )
         } catch {
             return ToolResultBlock(

@@ -11,6 +11,7 @@ public struct BashTool: AgentTool {
     public let name = "Bash"
     public let description = "Executes a given bash command and returns its output."
     public let isReadOnly = false
+    public var timeout: TimeInterval { 600 }
 
     /// Default timeout: 120 seconds.
     private static let defaultTimeoutMs = 120_000

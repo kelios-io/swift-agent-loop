@@ -56,12 +56,21 @@ public struct GlobTool: AgentTool, Sendable {
             return .error("Directory not found: \(baseURL.path)")
         }
 
+        // Resolve symlinks (e.g. /var → /private/var on macOS) so paths match enumerator output
+        let resolvedBaseURL: URL
+        if let realPath = realpath(baseURL.path, nil) {
+            resolvedBaseURL = URL(fileURLWithPath: String(cString: realPath))
+            free(realPath)
+        } else {
+            resolvedBaseURL = baseURL
+        }
+
         // Parse the pattern into prefix and filename portions around **
         let parsed = parsePattern(pattern)
 
         // Enumerate all files recursively
         guard let enumerator = FileManager.default.enumerator(
-            at: baseURL,
+            at: resolvedBaseURL,
             includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
             options: [.skipsHiddenFiles]
         ) else {
@@ -74,7 +83,7 @@ public struct GlobTool: AgentTool, Sendable {
         }
 
         var matches: [MatchedFile] = []
-        let basePath = baseURL.path.hasSuffix("/") ? baseURL.path : baseURL.path + "/"
+        let basePath = resolvedBaseURL.path.hasSuffix("/") ? resolvedBaseURL.path : resolvedBaseURL.path + "/"
 
         while let fileURL = enumerator.nextObject() as? URL {
             // Only match regular files

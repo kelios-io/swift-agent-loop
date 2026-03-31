@@ -3,7 +3,7 @@
 import Foundation
 
 /// Anthropic API version pinned for all requests.
-public let anthropicAPIVersion = "2023-06-01"
+public let anthropicAPIVersion = "2024-10-22"
 
 // MARK: - Request Types
 
@@ -14,6 +14,8 @@ public struct MessagesRequest: Codable, Sendable {
     public let system: [SystemBlock]?
     public let tools: [ToolDefinition]?
     public let stream: Bool
+    public let temperature: Double?
+    public let topP: Double?
 
     public init(
         model: String,
@@ -21,7 +23,9 @@ public struct MessagesRequest: Codable, Sendable {
         messages: [Message],
         system: [SystemBlock]? = nil,
         tools: [ToolDefinition]? = nil,
-        stream: Bool = false
+        stream: Bool = false,
+        temperature: Double? = nil,
+        topP: Double? = nil
     ) {
         self.model = model
         self.maxTokens = maxTokens
@@ -29,6 +33,8 @@ public struct MessagesRequest: Codable, Sendable {
         self.system = system
         self.tools = tools
         self.stream = stream
+        self.temperature = temperature
+        self.topP = topP
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -38,6 +44,8 @@ public struct MessagesRequest: Codable, Sendable {
         case system
         case tools
         case stream
+        case temperature
+        case topP = "top_p"
     }
 }
 

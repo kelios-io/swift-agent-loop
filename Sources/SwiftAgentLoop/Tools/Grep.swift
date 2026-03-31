@@ -333,8 +333,21 @@ public struct GrepTool: AgentTool, Sendable {
 
     /// Returns a path string relative to the base directory.
     private func relativePathString(_ url: URL, relativeTo base: URL) -> String {
-        let filePath = url.path
-        let basePath = base.path.hasSuffix("/") ? base.path : base.path + "/"
+        let filePath: String
+        if let rp = realpath(url.path, nil) {
+            filePath = String(cString: rp)
+            free(rp)
+        } else {
+            filePath = url.path
+        }
+        let resolvedBase: String
+        if let rp = realpath(base.path, nil) {
+            resolvedBase = String(cString: rp)
+            free(rp)
+        } else {
+            resolvedBase = base.path
+        }
+        let basePath = resolvedBase.hasSuffix("/") ? resolvedBase : resolvedBase + "/"
         if filePath.hasPrefix(basePath) {
             return String(filePath.dropFirst(basePath.count))
         }

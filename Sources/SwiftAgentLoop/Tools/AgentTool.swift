@@ -71,6 +71,9 @@ public protocol AgentTool: Sendable {
 
     /// Whether this tool is safe to run concurrently with other tools
     var isConcurrencySafe: Bool { get }
+
+    /// Maximum execution time in seconds before the tool is forcibly timed out.
+    var timeout: TimeInterval { get }
 }
 
 // MARK: - AgentTool Defaults
@@ -78,6 +81,7 @@ public protocol AgentTool: Sendable {
 extension AgentTool {
     public var isReadOnly: Bool { false }
     public var isConcurrencySafe: Bool { isReadOnly }
+    public var timeout: TimeInterval { 120 }
 }
 
 // MARK: - ToolError

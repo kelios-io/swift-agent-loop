@@ -14,6 +14,7 @@ public actor AnthropicClient: MessageStreaming {
     private let apiKey: String
     private let baseURL: URL
     private let session: URLSession
+    private let requestTimeout: TimeInterval
 
     /// Maximum retry attempts for rate-limited requests.
     private let maxRetries = 3
@@ -21,11 +22,13 @@ public actor AnthropicClient: MessageStreaming {
     public init(
         apiKey: String,
         baseURL: URL = URL(string: "https://api.anthropic.com")!,
-        session: URLSession = .shared
+        session: URLSession = .shared,
+        requestTimeout: TimeInterval = 300
     ) {
         self.apiKey = apiKey
         self.baseURL = baseURL
         self.session = session
+        self.requestTimeout = requestTimeout
     }
 
     /// Send a messages request and stream SSE events back.
@@ -63,7 +66,7 @@ public actor AnthropicClient: MessageStreaming {
 
     private func buildRequest(for messagesRequest: MessagesRequest) throws -> URLRequest {
         let url = baseURL.appendingPathComponent("v1/messages")
-        var request = URLRequest(url: url, timeoutInterval: 30)
+        var request = URLRequest(url: url, timeoutInterval: requestTimeout)
         request.httpMethod = "POST"
 
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
@@ -78,7 +81,9 @@ public actor AnthropicClient: MessageStreaming {
             messages: messagesRequest.messages,
             system: messagesRequest.system,
             tools: messagesRequest.tools,
-            stream: true
+            stream: true,
+            temperature: messagesRequest.temperature,
+            topP: messagesRequest.topP
         )
 
         let encoder = JSONEncoder()
