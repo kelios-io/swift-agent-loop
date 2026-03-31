@@ -23,4 +23,6 @@ Thumbs.db
 *.key
 
 # Reference docs (Fermata-specific, not part of the package)
-docs/
+docs/reference/
+docs/prd.md
+docs/i53-dual-mode-spec.md
