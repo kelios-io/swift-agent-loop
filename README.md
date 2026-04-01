@@ -131,6 +131,10 @@ A test harness is included for standalone validation:
 ANTHROPIC_API_KEY=sk-ant-... swift run AgentCLI "List the files in this directory"
 ```
 
+## Built for Fermata
+
+SwiftAgentLoop powers [Fermata](https://fermata.run) — a native macOS agent orchestrator for directing Claude sessions visually.
+
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).
