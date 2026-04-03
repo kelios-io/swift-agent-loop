@@ -28,6 +28,41 @@ public actor NativeTransport: AgentTransport {
     private var currentLoop: AgentLoop?
 
     public init(
+        credential: AuthCredential,
+        model: String = "claude-sonnet-4-6",
+        maxTokens: Int = 4096,
+        maxTurns: Int = 50,
+        tools: [any AgentTool] = [],
+        permissionCallback: PermissionCallback? = nil,
+        requestTimeout: TimeInterval = 300,
+        temperature: Double? = nil,
+        topP: Double? = nil,
+        thinkingEnabled: Bool = false,
+        thinkingBudgetTokens: Int? = nil,
+        contextCompressionEnabled: Bool = false
+    ) {
+        let client = AnthropicClient(credential: credential, requestTimeout: requestTimeout)
+        self.client = client
+        self.promptBuilder = SystemPromptBuilder()
+        self.permissionCallback = permissionCallback
+        self.model = model
+        self.maxTokens = maxTokens
+        self.maxTurns = maxTurns
+        self.temperature = temperature
+        self.topP = topP
+        self.thinkingEnabled = thinkingEnabled
+        self.thinkingBudgetTokens = thinkingBudgetTokens
+        self.contextCompressionEnabled = contextCompressionEnabled
+
+        if tools.isEmpty {
+            self.tools = []
+        } else {
+            self.tools = tools
+        }
+    }
+
+    /// Convenience initializer for API key authentication.
+    public init(
         apiKey: String,
         model: String = "claude-sonnet-4-6",
         maxTokens: Int = 4096,
@@ -41,25 +76,20 @@ public actor NativeTransport: AgentTransport {
         thinkingBudgetTokens: Int? = nil,
         contextCompressionEnabled: Bool = false
     ) {
-        let client = AnthropicClient(apiKey: apiKey, requestTimeout: requestTimeout)
-        self.client = client
-        self.promptBuilder = SystemPromptBuilder()
-        self.permissionCallback = permissionCallback
-        self.model = model
-        self.maxTokens = maxTokens
-        self.maxTurns = maxTurns
-        self.temperature = temperature
-        self.topP = topP
-        self.thinkingEnabled = thinkingEnabled
-        self.thinkingBudgetTokens = thinkingBudgetTokens
-        self.contextCompressionEnabled = contextCompressionEnabled
-
-        // If no tools provided, include SubagentTool by default
-        if tools.isEmpty {
-            self.tools = []
-        } else {
-            self.tools = tools
-        }
+        self.init(
+            credential: .apiKey(apiKey),
+            model: model,
+            maxTokens: maxTokens,
+            maxTurns: maxTurns,
+            tools: tools,
+            permissionCallback: permissionCallback,
+            requestTimeout: requestTimeout,
+            temperature: temperature,
+            topP: topP,
+            thinkingEnabled: thinkingEnabled,
+            thinkingBudgetTokens: thinkingBudgetTokens,
+            contextCompressionEnabled: contextCompressionEnabled
+        )
     }
 
     /// Internal init that accepts a pre-built client — used by `withDefaultTools()`.
@@ -159,7 +189,7 @@ public actor NativeTransport: AgentTransport {
 extension NativeTransport {
     /// Create a transport with all built-in tools registered, including the Agent tool for subagent spawning.
     public static func withDefaultTools(
-        apiKey: String,
+        credential: AuthCredential,
         model: String = "claude-sonnet-4-6",
         permissionCallback: PermissionCallback? = nil,
         requestTimeout: TimeInterval = 300,
@@ -169,8 +199,7 @@ extension NativeTransport {
         thinkingBudgetTokens: Int? = nil,
         contextCompressionEnabled: Bool = false
     ) -> NativeTransport {
-        // Create client first so SubagentTool can share it
-        let client = AnthropicClient(apiKey: apiKey, requestTimeout: requestTimeout)
+        let client = AnthropicClient(credential: credential, requestTimeout: requestTimeout)
         let subagentTool = SubagentTool(client: client, parentModel: model)
 
         return NativeTransport(
@@ -188,6 +217,31 @@ extension NativeTransport {
                 subagentTool
             ],
             permissionCallback: permissionCallback,
+            temperature: temperature,
+            topP: topP,
+            thinkingEnabled: thinkingEnabled,
+            thinkingBudgetTokens: thinkingBudgetTokens,
+            contextCompressionEnabled: contextCompressionEnabled
+        )
+    }
+
+    /// Convenience factory for API key authentication.
+    public static func withDefaultTools(
+        apiKey: String,
+        model: String = "claude-sonnet-4-6",
+        permissionCallback: PermissionCallback? = nil,
+        requestTimeout: TimeInterval = 300,
+        temperature: Double? = nil,
+        topP: Double? = nil,
+        thinkingEnabled: Bool = false,
+        thinkingBudgetTokens: Int? = nil,
+        contextCompressionEnabled: Bool = false
+    ) -> NativeTransport {
+        withDefaultTools(
+            credential: .apiKey(apiKey),
+            model: model,
+            permissionCallback: permissionCallback,
+            requestTimeout: requestTimeout,
             temperature: temperature,
             topP: topP,
             thinkingEnabled: thinkingEnabled,
