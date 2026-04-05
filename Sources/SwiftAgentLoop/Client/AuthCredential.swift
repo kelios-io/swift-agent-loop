@@ -3,10 +3,15 @@ import Foundation
 // MARK: - Auth Credential
 
 /// How to authenticate with the Anthropic API.
+///
+/// > **Important:** OAuth tokens from Claude Pro/Max subscriptions are restricted to official
+/// > Anthropic applications per the Consumer Terms of Service. The `.oauth` credential is provided
+/// > for Teams/Enterprise accounts or applications with explicit Anthropic authorization.
+/// > For most use cases, use `.apiKey` with an API key from console.anthropic.com.
 public enum AuthCredential: Sendable {
-    /// Direct API key from console.anthropic.com (pay-per-token).
+    /// Direct API key from console.anthropic.com (pay-per-token). Recommended for third-party apps.
     case apiKey(String)
-    /// OAuth tokens from Claude Pro/Max/Teams/Enterprise subscription.
+    /// OAuth tokens for Teams/Enterprise accounts or Anthropic-authorized applications.
     case oauth(OAuthTokenManager)
 }
 

@@ -93,6 +93,15 @@ for await event in stream {
 }
 ```
 
+## Authentication
+
+The library supports two authentication modes via `AuthCredential`:
+
+- **`.apiKey(String)`** — API key from [console.anthropic.com](https://console.anthropic.com). Recommended for all third-party apps.
+- **`.oauth(OAuthTokenManager)`** — OAuth bearer tokens with automatic refresh. For Teams/Enterprise accounts or Anthropic-authorized applications only.
+
+> **Note:** Anthropic's Consumer ToS restricts OAuth tokens from Claude Pro/Max subscriptions to official Anthropic applications. Third-party apps should use API keys.
+
 ## Architecture
 
 ```
