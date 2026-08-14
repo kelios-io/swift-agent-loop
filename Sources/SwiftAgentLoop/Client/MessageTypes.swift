@@ -3,7 +3,9 @@
 import Foundation
 
 /// Anthropic API version pinned for all requests.
-public let anthropicAPIVersion = "2024-10-22"
+/// "2023-06-01" is the only stable version string; newer features are gated
+/// via `anthropic-beta` headers, not new version dates.
+public let anthropicAPIVersion = "2023-06-01"
 
 // MARK: - Request Types
 
@@ -433,12 +435,19 @@ public enum DeltaContent: Codable, Sendable {
     case textDelta(text: String)
     case inputJSONDelta(partialJSON: String)
     case thinkingDelta(thinking: String)
+    /// Cryptographic signature for a thinking block, streamed at the end of
+    /// the block. Must be preserved and replayed with the block.
+    case signatureDelta(signature: String)
+    /// Forward compatibility: the API adds delta types over time and clients
+    /// must ignore ones they don't know rather than failing the stream.
+    case unknown(type: String)
 
     private enum CodingKeys: String, CodingKey {
         case type
         case text
         case partialJson = "partial_json"
         case thinking
+        case signature
     }
 
     public init(from decoder: Decoder) throws {
@@ -454,11 +463,11 @@ public enum DeltaContent: Codable, Sendable {
         case "thinking_delta":
             let thinking = try container.decode(String.self, forKey: .thinking)
             self = .thinkingDelta(thinking: thinking)
+        case "signature_delta":
+            let signature = try container.decode(String.self, forKey: .signature)
+            self = .signatureDelta(signature: signature)
         default:
-            throw DecodingError.dataCorruptedError(
-                forKey: .type, in: container,
-                debugDescription: "Unknown delta type: \(type)"
-            )
+            self = .unknown(type: type)
         }
     }
 
@@ -474,6 +483,11 @@ public enum DeltaContent: Codable, Sendable {
         case .thinkingDelta(let thinking):
             try container.encode("thinking_delta", forKey: .type)
             try container.encode(thinking, forKey: .thinking)
+        case .signatureDelta(let signature):
+            try container.encode("signature_delta", forKey: .type)
+            try container.encode(signature, forKey: .signature)
+        case .unknown(let type):
+            try container.encode(type, forKey: .type)
         }
     }
 }

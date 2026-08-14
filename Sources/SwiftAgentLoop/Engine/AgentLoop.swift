@@ -357,6 +357,17 @@ public actor AgentLoop {
                         blocksByIndex[index] = .thinking(accumulated: accumulated, signature: sig)
                     }
                     continuation.yield(.thinkingDelta(thinking))
+
+                case .signatureDelta(let signature):
+                    // Streamed at the end of a thinking block; must be replayed
+                    // with the block or the API rejects the next turn.
+                    if case .thinking(let accumulated, _) = blocksByIndex[index] {
+                        blocksByIndex[index] = .thinking(accumulated: accumulated, signature: signature)
+                    }
+
+                case .unknown:
+                    // Per API streaming docs, ignore delta types we don't know.
+                    break
                 }
 
             case .contentBlockStop(let stop):
