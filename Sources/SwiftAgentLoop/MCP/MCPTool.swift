@@ -10,9 +10,9 @@ public struct MCPTool: AgentTool {
     public let isReadOnly: Bool
     public let timeout: TimeInterval
 
-    private let client: MCPClient
+    private let client: any MCPConnection
 
-    public init(info: MCPToolInfo, client: MCPClient, isReadOnly: Bool = false, timeout: TimeInterval = 60) {
+    public init(info: MCPToolInfo, client: any MCPConnection, isReadOnly: Bool = false, timeout: TimeInterval = 60) {
         self.name = info.name
         self.description = info.description
         self.inputSchema = InputSchema((info.inputSchema.anyValue as? [String: Any]) ?? ["type": "object"])
@@ -34,14 +34,5 @@ public struct MCPTool: AgentTool {
         } catch {
             return .error("MCP call failed: \(error)")
         }
-    }
-}
-
-extension MCPClient {
-    /// Convenience: fetch the server's catalog as ready-to-register agent tools.
-    /// `readOnly` marks every tool as safe for parallel execution — set it only
-    /// for servers you know are read-only (permission callbacks still apply).
-    public func agentTools(readOnly: Bool = false) async throws -> [any AgentTool] {
-        try await listTools().map { MCPTool(info: $0, client: self, isReadOnly: readOnly) }
     }
 }
