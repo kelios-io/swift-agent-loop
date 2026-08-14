@@ -371,6 +371,48 @@ struct AgentLoopTests {
 
     // MARK: 6. Cancellation
 
+    @Test("Loop is reusable after cancellation — conversation survives")
+    func reusableAfterCancel() async throws {
+        let client = MockClient(responses: [
+            toolUseResponse(toolId: "tu_1", toolName: "slow_tool", inputJSON: "{}"),
+            textResponse("second run answer"),
+        ])
+        let tool = MockTool(name: "slow_tool") { @Sendable _ in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            return .success("slow result")
+        }
+        let config = AgentConfiguration(maxTokens: 1024, maxTurns: 10, tools: [tool])
+        let loop = AgentLoop(client: client, configuration: config)
+
+        // First run: cancel while the tool executes.
+        let first = await loop.run(prompt: "Do something slow")
+        let cancelTask = Task {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            await loop.cancel()
+        }
+        for await _ in first {}
+        cancelTask.cancel()
+
+        // Second run on the SAME loop must proceed (not abort immediately)
+        // and complete normally.
+        let events = await collectEvents(from: await loop.run(prompt: "Try again"))
+        let text = events.compactMap { event -> String? in
+            if case .textDelta(let delta) = event { return delta }
+            return nil
+        }.joined()
+        #expect(text.contains("second run answer"))
+
+        let doneReasons = events.compactMap { event -> StopReason? in
+            if case .done(let reason) = event { return reason }
+            return nil
+        }
+        #expect(doneReasons.count == 1)
+        if case .completed? = doneReasons.first {
+        } else {
+            Issue.record("expected .completed after post-cancel run, got \(String(describing: doneReasons.first))")
+        }
+    }
+
     @Test("Cancellation stops the loop with aborted")
     func cancellation() async throws {
         // First response calls a tool; while the tool executes we cancel
