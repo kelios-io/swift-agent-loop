@@ -113,12 +113,8 @@ public actor MCPClient {
 
         let stdout = stdoutPipe.fileHandleForReading
         readTask = Task { [weak self] in
-            do {
-                for try await line in stdout.bytes.lines {
-                    await self?.handleLine(line)
-                }
-            } catch {
-                // fall through to connection-closed handling
+            for await line in Self.lines(from: stdout) {
+                await self?.handleLine(line)
             }
             await self?.connectionClosed()
         }
@@ -267,6 +263,44 @@ public actor MCPClient {
     private func timeOut(id: Int, method: String) {
         guard let continuation = pending.removeValue(forKey: id) else { return }
         continuation.resume(throwing: MCPError.timedOut(method: method))
+    }
+
+    /// Newline-delimited lines from a pipe, streamed via `readabilityHandler`
+    /// on GCD. NEVER use `FileHandle.bytes` here: it performs a blocking
+    /// `read(2)` on the Swift cooperative thread pool, which starves every
+    /// other task in the host process while the server is quiet (observed as
+    /// a full app hang).
+    private static func lines(from handle: FileHandle) -> AsyncStream<String> {
+        final class Buffer: @unchecked Sendable {
+            // Only touched from FileHandle's serial handler queue.
+            var data = Data()
+        }
+        return AsyncStream { continuation in
+            let buffer = Buffer()
+            handle.readabilityHandler = { handle in
+                let chunk = handle.availableData
+                if chunk.isEmpty { // EOF
+                    handle.readabilityHandler = nil
+                    if !buffer.data.isEmpty, let line = String(data: buffer.data, encoding: .utf8) {
+                        continuation.yield(line)
+                    }
+                    continuation.finish()
+                    return
+                }
+                buffer.data.append(chunk)
+                while let newline = buffer.data.firstIndex(of: 0x0A) {
+                    var lineData = buffer.data.subdata(in: buffer.data.startIndex..<newline)
+                    buffer.data.removeSubrange(buffer.data.startIndex...newline)
+                    if lineData.last == 0x0D { lineData.removeLast() }
+                    if let line = String(data: lineData, encoding: .utf8) {
+                        continuation.yield(line)
+                    }
+                }
+            }
+            continuation.onTermination = { _ in
+                handle.readabilityHandler = nil
+            }
+        }
     }
 
     private func connectionClosed() {
