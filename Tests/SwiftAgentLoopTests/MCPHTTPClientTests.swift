@@ -176,6 +176,39 @@ struct MCPHTTPClientTests {
         #expect(seenAuth.value == "Bearer lin_api_123")
     }
 
+    @Test("Authorization survives a same-origin slash redirect")
+    func redirectKeepsAuthorization() async throws {
+        let host = "http-redirect.test"
+        let authAtTarget = TestBox<String?>(nil)
+        MockHTTP.register(host: host) { request in
+            // FastAPI-style: the canonical endpoint 307s to the slash variant.
+            // (URL.path strips the trailing slash, so match the absolute string.)
+            if !request.url!.absoluteString.hasSuffix("/mcp/") {
+                return (307, ["Location": "https://\(host)/mcp/"], Data())
+            }
+            authAtTarget.value = request.value(forHTTPHeaderField: "Authorization")
+            guard request.value(forHTTPHeaderField: "Authorization") == "Bearer tok-1" else {
+                return (401, ["WWW-Authenticate": "Bearer"], Data())
+            }
+            let call = request.rpcCall
+            guard let id = call.id else { return (202, [:], Data()) }
+            switch call.method {
+            case "initialize": return HubFixture.initializeResult(id: id)
+            default: return HubFixture.toolsResult(id: id)
+            }
+        }
+
+        let client = MCPHTTPClient(
+            endpoint: URL(string: "https://\(host)/mcp")!,
+            authorization: .bearer("tok-1"),
+            session: MockHTTP.makeSession()
+        )
+        try await client.start()
+        let tools = try await client.listTools()
+        #expect(tools.count == 1)
+        #expect(authAtTarget.value == "Bearer tok-1")
+    }
+
     @Test("An expired session (404) re-initializes and replays the request")
     func sessionExpiryReinitializes() async throws {
         let host = "http-expiry.test"

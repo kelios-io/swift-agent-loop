@@ -44,7 +44,16 @@ public actor MCPHTTPClient: MCPConnection {
     public init(endpoint: URL, authorization: MCPHTTPAuthorization = .none, session: URLSession = .shared) {
         self.endpoint = endpoint
         self.authorization = authorization
-        self.session = session
+        // Rebuild the session around a redirect-preserving delegate:
+        // URLSession strips Authorization when following redirects, so a
+        // server that slash-redirects its endpoint (FastAPI /mcp → /mcp/)
+        // would turn every authenticated call into a 401. The caller's
+        // configuration (mock protocols, cookies, timeouts) is kept.
+        self.session = URLSession(
+            configuration: session.configuration,
+            delegate: RedirectPreservingDelegate(),
+            delegateQueue: nil
+        )
     }
 
     // MARK: Lifecycle
@@ -341,4 +350,29 @@ public actor MCPHTTPClient: MCPConnection {
 private enum TransportSignal: Error {
     case unauthorized(String?)
     case sessionNotFound
+}
+
+// MARK: - Redirect handling
+
+/// Re-attaches the original request's Authorization header when a redirect
+/// stays on the same scheme+host. Cross-origin redirects keep URLSession's
+/// default behavior (header stripped) — never leak tokens to another host.
+private final class RedirectPreservingDelegate: NSObject, URLSessionTaskDelegate {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping @Sendable (URLRequest?) -> Void
+    ) {
+        var request = request
+        if request.value(forHTTPHeaderField: "Authorization") == nil,
+           let original = task.originalRequest,
+           let authorization = original.value(forHTTPHeaderField: "Authorization"),
+           original.url?.host == request.url?.host,
+           original.url?.scheme == request.url?.scheme {
+            request.setValue(authorization, forHTTPHeaderField: "Authorization")
+        }
+        completionHandler(request)
+    }
 }
