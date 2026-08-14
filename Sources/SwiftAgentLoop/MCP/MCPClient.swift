@@ -35,6 +35,8 @@ public enum MCPError: Error, Sendable {
     case protocolError(String)
     case serverError(code: Int, message: String)
     case timedOut(method: String)
+    /// Non-2xx HTTP status outside the JSON-RPC layer (Streamable HTTP only).
+    case httpError(status: Int, body: String)
 }
 
 // MARK: - JSON-RPC envelope
@@ -61,7 +63,7 @@ struct JSONRPCErrorObject: Codable {
 /// `tools/call`. Requests are correlated by id; unknown incoming messages are
 /// ignored (notifications) or answered with method-not-found (requests), per
 /// the MCP spec's forward-compatibility rules.
-public actor MCPClient {
+public actor MCPClient: MCPConnection {
     public static let protocolVersion = "2025-06-18"
 
     private let executable: String
@@ -122,14 +124,11 @@ public actor MCPClient {
             Task { await self?.connectionClosed() }
         }
 
-        _ = try await request(method: "initialize", params: .object([
-            "protocolVersion": .string(Self.protocolVersion),
-            "capabilities": .object([:]),
-            "clientInfo": .object([
-                "name": .string(clientName),
-                "version": .string(clientVersion),
-            ]),
-        ]))
+        _ = try await request(method: "initialize", params: MCPWire.initializeParams(
+            clientName: clientName,
+            clientVersion: clientVersion,
+            protocolVersion: Self.protocolVersion
+        ))
         try notify(method: "notifications/initialized", params: .object([:]))
     }
 
@@ -151,23 +150,9 @@ public actor MCPClient {
             var params: [String: JSONValue] = [:]
             if let cursor { params["cursor"] = cursor }
             let result = try await request(method: "tools/list", params: .object(params))
-            guard case .object(let object) = result,
-                  case .array(let entries)? = object["tools"] else {
-                throw MCPError.protocolError("tools/list: missing tools array")
-            }
-            for entry in entries {
-                guard case .object(let tool) = entry,
-                      case .string(let name)? = tool["name"] else { continue }
-                var description = ""
-                if case .string(let text)? = tool["description"] { description = text }
-                tools.append(MCPToolInfo(
-                    name: name,
-                    description: description,
-                    inputSchema: tool["inputSchema"] ?? .object(["type": .string("object")])
-                ))
-            }
-            cursor = object["nextCursor"]
-            if case .null = cursor { cursor = nil }
+            let page = try MCPWire.decodeToolsPage(result)
+            tools.append(contentsOf: page.tools)
+            cursor = page.nextCursor
         } while cursor != nil
         return tools
     }
@@ -180,23 +165,7 @@ public actor MCPClient {
             "name": .string(name),
             "arguments": arguments,
         ]))
-        guard case .object(let object) = result else {
-            throw MCPError.protocolError("tools/call: non-object result")
-        }
-        var isError = false
-        if case .bool(let flag)? = object["isError"] { isError = flag }
-        var parts: [String] = []
-        if case .array(let content)? = object["content"] {
-            for part in content {
-                guard case .object(let block) = part else { continue }
-                if case .string("text")? = block["type"], case .string(let text)? = block["text"] {
-                    parts.append(text)
-                } else if case .string(let kind)? = block["type"] {
-                    parts.append("[unsupported content type: \(kind)]")
-                }
-            }
-        }
-        return MCPCallResult(text: parts.joined(separator: "\n"), isError: isError)
+        return try MCPWire.decodeCallResult(result)
     }
 
     // MARK: JSON-RPC plumbing
