@@ -101,6 +101,10 @@ public actor AgentLoop {
         prompt: String,
         continuation: AsyncStream<AgentEvent>.Continuation
     ) async {
+        // A cancel applies to the run it interrupted, not to the loop's
+        // lifetime — clear it so the conversation can continue afterwards.
+        state.isCancelled = false
+
         // 1. Append user message to history
         state.messages.append(Message(role: .user, content: .text(prompt)))
 
@@ -148,16 +152,18 @@ public actor AgentLoop {
                         continuation: continuation
                     )
 
+                    // Append tool results as a user message BEFORE any early
+                    // return — a dangling tool_use without its tool_result
+                    // makes the history invalid for the next request.
+                    let resultBlocks = toolResults.map { ContentBlock.toolResult($0) }
+                    state.messages.append(Message(role: .user, content: .blocks(resultBlocks)))
+
                     // Check if cancelled during tool execution
                     if state.isCancelled {
                         continuation.yield(.done(stopReason: .aborted))
                         continuation.finish()
                         return
                     }
-
-                    // Append tool results as a user message
-                    let resultBlocks = toolResults.map { ContentBlock.toolResult($0) }
-                    state.messages.append(Message(role: .user, content: .blocks(resultBlocks)))
 
                     state.turnCount += 1
                     continuation.yield(.turnComplete(turnNumber: state.turnCount))
