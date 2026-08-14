@@ -37,6 +37,20 @@ final class MockHTTP: URLProtocol {
         }
         let (status, headers, body) = handler(request)
         let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)!
+        if (300...399).contains(status), let location = headers["Location"],
+           let target = URL(string: location, relativeTo: url) {
+            // Mimic URLSession's real redirect behavior: same method/body for
+            // 307/308, headers copied EXCEPT Authorization (stripped — that is
+            // the behavior the client's delegate must compensate for).
+            var redirect = URLRequest(url: target.absoluteURL)
+            redirect.httpMethod = request.httpMethod
+            redirect.httpBody = request.bodyBytes
+            for (name, value) in request.allHTTPHeaderFields ?? [:] where name.lowercased() != "authorization" {
+                redirect.setValue(value, forHTTPHeaderField: name)
+            }
+            client?.urlProtocol(self, wasRedirectedTo: redirect, redirectResponse: response)
+            return
+        }
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: body)
         client?.urlProtocolDidFinishLoading(self)
