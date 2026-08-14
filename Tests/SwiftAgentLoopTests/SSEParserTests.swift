@@ -266,6 +266,44 @@ struct SSEParserTests {
         }
     }
 
+    // 11a. Content block delta (thinking signature)
+    @Test("Parses content_block_delta with signature_delta")
+    func contentBlockDeltaSignature() async {
+        let json = #"{"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"EqQBCgIYAhIM"}}"#
+        let raw = "event: content_block_delta\ndata: \(json)\n\n"
+        let events = await collectEvents(from: [bytesChunk(raw)])
+
+        #expect(events.count == 1)
+        guard case .contentBlockDelta(let e) = events.first else {
+            Issue.record("Expected contentBlockDelta")
+            return
+        }
+        if case .signatureDelta(let signature) = e.delta {
+            #expect(signature == "EqQBCgIYAhIM")
+        } else {
+            Issue.record("Expected signatureDelta")
+        }
+    }
+
+    // 11b. Unknown delta types are tolerated (API adds types over time)
+    @Test("Unknown delta type decodes as .unknown instead of failing the stream")
+    func contentBlockDeltaUnknownType() async {
+        let json = #"{"type":"content_block_delta","index":0,"delta":{"type":"future_delta","future_field":"x"}}"#
+        let raw = "event: content_block_delta\ndata: \(json)\n\n"
+        let events = await collectEvents(from: [bytesChunk(raw)])
+
+        #expect(events.count == 1)
+        guard case .contentBlockDelta(let e) = events.first else {
+            Issue.record("Expected contentBlockDelta")
+            return
+        }
+        if case .unknown(let type) = e.delta {
+            #expect(type == "future_delta")
+        } else {
+            Issue.record("Expected unknown")
+        }
+    }
+
     // 12. Message stop
     @Test("Parses message_stop event")
     func messageStop() async {
